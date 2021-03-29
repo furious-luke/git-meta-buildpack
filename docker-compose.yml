@@ -1,0 +1,12 @@
+version: "3"
+services:
+
+  git-meta-buildpack:
+    build:
+      context: .
+    volumes:
+      - ./bin:/tmp/bin
+      - ./test-app:/code
+    environment:
+      - DST_2_BRANCH=readme-edits
+    working_dir: /code

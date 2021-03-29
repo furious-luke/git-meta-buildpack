@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+export BUILD_DIR=$1
+export ENV_DIR=$3
+export META_VERSION=2.2.15
+
+GIT_USERNAME="$(cat $ENV_DIR/GIT_USERNAME 2>/dev/null || true)"
+GIT_PASSWORD="$(cat $ENV_DIR/GIT_PASSWORD 2>/dev/null || true)"
+
+function indent() {
+    c='s/^/       /'
+    case $(uname) in
+        Darwin) sed -l "$c";;
+        *)      sed -u "$c";;
+    esac
+}
+
+function make_url() {
+    if [ "$(echo $1 | cut -c1-3)" = "git" ]; then
+        proto="https://"
+        prefix="$(echo $1 | grep @ | sed -e's,^\(.*@\).*,\1,g')"
+        # remove the protocol/prefix
+        url="$(echo ${1/$prefix/})"
+        # extract the host
+        host="$(echo $url | grep : | sed -e's,^\(.*\):.*,\1,g')"
+        # remove the host
+        path="/$(echo ${url/$host:/})"
+    else
+        proto="$(echo $1 | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+        # remove the protocol
+        url="$(echo ${1/$proto/})"
+        # extract the host
+        host="$(echo ${url/$user@/} | cut -d/ -f1)"
+        # by request - try to extract the port
+        port="$(echo $host | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
+        # extract the path (if any)
+        path="/$(echo $url | grep / | cut -d/ -f2-)"
+    fi
+    echo "$proto$GIT_USERNAME:$GIT_PASSWORD@$host$path"
+}
+
+echo "-----> Install meta repositories"
+cd "$BUILD_DIR"
+while read line; do
+    parts=($(echo $line | tr -d "," | tr -d "}" | tr -d "{" | tr -d '"' | tr -s " " | cut -d " " -f 1,2))
+    if [ "${#parts[@]}" -eq 2 ]; then
+        dst=${parts[0]%?}
+        url=${parts[1]}
+        env_name=${dst^^}_BRANCH
+        branch_name=$(printf '%s' "${!env_name}")
+        full_url=$(make_url $url)
+        if [ ! -z "${branch_name}" ]; then
+            echo Cloning ${url} at branch ${branch_name} into ${dst} ...
+            $(git clone --single-branch -b ${branch_name} $full_url $dst)
+        else
+            echo Cloning ${url} into ${dst} ...
+            $(git clone $full_url $dst)
+        fi
+    fi
+done < .meta

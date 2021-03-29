@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "dst_1": "git@github.com:stobasa/hello-world.git",
+    "dst_2": "https://github.com/stobasa/hello-world.git"
+  }
+}
